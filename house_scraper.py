@@ -1,3 +1,4 @@
+#%%
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
@@ -52,12 +53,16 @@ def send_notification_to_owner(listing, address_selector, email_selector, url):
     address = listing.select_one(address_selector).text
     owner_email = listing.select_one(email_selector).text
 
-    # Customize the message based on the house address
-    email_message_to_owner = f"Subject: Interested in your listing at {address}\n\nI am interested in the house at {address}. Please contact me for further details."
+    # Customized email
+    email_message_to_owner = f"I am very interested in viewing the available studio ({address})) and would like to arrange a visit as soon as possible. 
+    \n\nMy gross monthly income is €4000, I live alone, have no pets, and I am a non-smoker. I am currently employed as the Head of Product and Machine Learning Engineer at a health tech company based in Amsterdam.
+    \n\nReach me at 0649273156 or respond directly to this email (simone.parvizi@outlook.it) to confirm the appointment or to discuss any other details.
+    \n\n\nThank you for considering my application. I am looking forward to hearing back from you soon.
+    \n\nKindly,\nSimone Parvizi"
 
     # Send email to owner
     with smtplib.SMTP('smtp.gmail.com', 587) as server:
-        server.starttls()  # Upgrade the connection to secure encrypted SSL/TLS connection
+        server.starttls()  # Upgrade the connection to secure encrypted SSL/TLS connection ????????
         server.login("youremail@gmail.com", "your_password_or_app_specific_password")
 
         # Send email to the owner
@@ -117,3 +122,28 @@ try:
 
 except Exception as e:
     logging.error(f'An unexpected error occurred: {e}')
+
+# %% Test notifications
+
+from bs4 import BeautifulSoup
+
+# ... [Your imports and the send_notification_to_owner function] ...
+
+# Dummy BeautifulSoup listing object
+html = """
+<div class="listing">
+    <div class="address">123 Test Street</div>
+    <div class="email">owner@example.com</div>
+</div>
+"""
+soup = BeautifulSoup(html, 'html.parser')
+listing = soup.select_one('.listing')
+
+# Dummy website details for testing
+url = "https://example.com/test-listing"
+address_selector = ".address"
+email_selector = ".email"
+
+# Invoke the function
+send_notification_to_owner(listing, address_selector, email_selector, url)
+
