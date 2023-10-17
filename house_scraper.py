@@ -74,7 +74,7 @@ def send_notification_to_owner(listing, address_selector, email_selector, url):
     # Send emails
     with smtplib.SMTP('smtp-mail.outlook.com', 587) as server:
         server.starttls()  # Upgrade the connection to secure encrypted SSL/TLS connection ????????
-        server.login({OUTLOOK_EMAIL}, EMAIL_PASSWORD)
+        server.login(OUTLOOK_EMAIL, EMAIL_PASSWORD)
 
 
         # Custom message
@@ -94,7 +94,7 @@ def send_notification_to_owner(listing, address_selector, email_selector, url):
 
         # Send the email to the owner
         server.sendmail(
-            {OUTLOOK_EMAIL},
+            OUTLOOK_EMAIL,
             owner_email,
             full_email.encode("utf-8")
             )
@@ -115,8 +115,8 @@ def send_notification_to_owner(listing, address_selector, email_selector, url):
 
         # Send the notification email to yourself
         server.sendmail(
-            "{}".format(OUTLOOK_EMAIL),
-            "{}".format(OUTLOOK_EMAIL),
+            OUTLOOK_EMAIL,
+            OUTLOOK_EMAIL,
             full_notification_email.encode("utf-8")
             )
 
@@ -196,4 +196,92 @@ if __name__ == '__main__':
     except Exception as e:
         logging.error(f'An unexpected error occurred: {e}')
 
+#%%
 
+def send_notification_to_owner(listing, address_selector, email_selector, url):
+    address = listing.select_one(address_selector).text
+    owner_email = listing.select_one(email_selector).text
+
+    google_maps_url = f"https://www.google.com/maps/search/?api=1&query={address.replace(' ', '+')}"
+
+    # Customized email
+    email_message_to_owner = f"""
+    I am very interested in viewing the available studio ({address}) and would like to arrange a visit as soon as possible. 
+
+    My gross monthly income is 4000 euros, I live alone, have no pets, and I am a non-smoker. I am currently employed as the Head of Product and Machine Learning Engineer at a health tech company based in Amsterdam.
+
+    Reach me at {PHONE_NUMBER} or respond directly to this email ({OUTLOOK_EMAIL}) to confirm the appointment or to discuss any other details.
+
+    Thank you for considering my application. I am looking forward to hearing back from you soon.
+
+    Kindly,
+    Simone Parvizi
+    """
+
+
+    # Send emails
+    with smtplib.SMTP('smtp-mail.outlook.com', 587) as server:
+        server.starttls()  # Upgrade the connection to secure encrypted SSL/TLS connection ????????
+        server.login(OUTLOOK_EMAIL, EMAIL_PASSWORD)
+
+
+        # Custom message
+        notification_email = f"You sent an email for the studio in {address} ({url}).\nHere's the location: {google_maps_url} "
+        
+
+
+        # For the owner email:
+        headers = [
+            "From: {}".format(OUTLOOK_EMAIL),
+            "Subject: Studio in {}".format(address),
+            "To: {}".format(owner_email),
+            "MIME-Version: 1.0",
+            "Content-Type: text/plain; charset=utf-8"
+        ]
+        full_email = "\r\n".join(headers) + "\r\n\r\n" + email_message_to_owner
+
+        # Send the email to the owner
+        server.sendmail(
+            OUTLOOK_EMAIL,
+            owner_email,
+            full_email.encode("utf-8")
+            )
+
+        # Email to yourself:
+        headers = [
+            "From: {}".format(OUTLOOK_EMAIL),
+            "Subject: FOUND A STUDIO at {}".format(address),
+            "To: {}".format(OUTLOOK_EMAIL),
+            "In-Reply-To: {}".format(owner_email),
+            "References: {}".format(owner_email),
+            "MIME-Version: 1.0",
+            "Content-Type: text/plain; charset=utf-8"
+            ]
+        
+        full_notification_email = "\r\n".join(headers) + "\r\n\r\n" + notification_email
+
+
+        # Send the notification email to yourself
+        server.sendmail(
+            OUTLOOK_EMAIL,
+            OUTLOOK_EMAIL,
+            full_notification_email.encode("utf-8")
+            )
+
+html = """
+<div class="listing">
+    <div class="address">123 Test Street</div>
+    <div class="email">parvizi.simone@gmail.com</div>
+</div>
+"""
+soup = BeautifulSoup(html, 'html.parser')
+listing = soup.select_one('.listing')
+
+# Dummy website
+url = "https://example.com/test-listing"
+address_selector = ".address"
+email_selector = ".email"
+
+send_notification_to_owner(listing, address_selector, email_selector, url)
+
+# %%
