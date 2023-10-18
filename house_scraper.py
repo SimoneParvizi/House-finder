@@ -1,6 +1,7 @@
 #%%
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.keys import Keys
 from bs4 import BeautifulSoup
 import time
 import smtplib
@@ -10,9 +11,13 @@ import random
 import requests
 from dotenv import load_dotenv
 import os 
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException
 
-from database import setup_db, store_listings, get_previous_listings
-#%%
+from database import setup_db #, store_listings, get_previous_listings
+
 
 chrome_options = Options()
 chrome_options.add_argument("--headless")
@@ -46,6 +51,7 @@ OUTLOOK_EMAIL = os.environ.get('OUTLOOK_EMAIL')
 GMAIL_EMAIL = os.environ.get('GMAIL_EMAIL')
 PHONE_NUMBER = os.environ.get('PHONE_NUMBER')
 IFTTT_WEBHOOKS_URL = os.environ.get('IFTTT_WEBHOOKS_URL')
+
 
 
 def check_new_listings(url, listing_selector):
@@ -155,9 +161,75 @@ def send_ifttt_notification(value1):
     print(f"Payload: {data}")
     return response.status_code
 
-#%%
+
+def login_to_huurstunt(email, password):
+    try:
+        driver.get("https://www.huurstunt.nl/")
+
+        # Wait for the login button on the main page to appear and click it.
+        login_button = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, "//a[@href='/inloggen']"))
+        )
+        login_button.click()
+
+        # Wait for the login fields to appear.
+        email_input = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "email"))
+        )
+        password_input = driver.find_element(By.ID, "password")
+        submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
+
+        email_input.send_keys(email)
+        password_input.send_keys(password)
+        submit_button.click()
+
+        # A basic check to verify successful login
+        WebDriverWait(driver, 10).until(EC.url_contains("dashboard"))
+        
+        logging.info("Successfully logged in to huurstunt.nl!")
+
+    except NoSuchElementException as e:
+        logging.error(f"Element not found during login process: {e}")
+    except Exception as e:
+        logging.error(f"An error occurred during the login process: {e}")
+
+
+def login_to_pararius(email, password):
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # Run Chrome in headless mode
+    driver = webdriver.Chrome(options=chrome_options)
+
+    driver.get("https://www.pararius.nl/inloggen")
+
+    # Click on 'Login with Google'
+    google_login_button = driver.find_element(By.XPATH, "//a[contains(text(), 'Ga verder met Google')]")
+    google_login_button.click()
+
+    # Wait for the Google login page to load (you might need to adjust the waiting time)
+    time.sleep(3)
+
+    # Fill in the email and password
+    email_input = driver.find_element(By.XPATH, "//input[@type='email']")
+    email_input.send_keys(email)
+    email_input.send_keys(Keys.RETURN)
+
+    time.sleep(3)  # Wait for the password field to appear
+
+    password_input = driver.find_element(By.XPATH, "//input[@type='password']")
+    password_input.send_keys(password)
+    password_input.send_keys(Keys.RETURN)
+
+    # Optionally, you can return the driver to use it for further interactions
+    return driver
+
+
 if __name__ == '__main__':
     setup_db()
+
+    # Log in to the website before starting the scraping loop
+    if not login_to_huurstunt():
+        logging.error("Failed to log in to the website. Exiting script.")
+        exit(1)  # Exit the script with an error code
 
     previous_listings = {}
     MAX_PREVIOUS_LISTINGS = 100 
@@ -173,7 +245,7 @@ if __name__ == '__main__':
                 logging.info(f'Checking new listings for {url}')
                 
                 # Fetch the previous listings from the database
-                previous_listings_for_url = get_previous_listings(url)
+                previous_listings_for_url = get_listings_from_db(url)  # Use this function
                 
                 try:
                     current_listings = check_new_listings(url, listing_selector)
@@ -181,11 +253,9 @@ if __name__ == '__main__':
                     logging.error(f'Error checking listings for {url}: {e}')
                     continue  # Skip to the next website
                 
-                previous_listings_for_url = get_listings_from_db(url)
-
                 # Find new listings that aren't in the previous listings
                 new_listings = [listing for listing in current_listings if listing not in previous_listings_for_url]
-                                
+                
                 for listing in new_listings:
                     try:
                         send_notification_to_owner(listing, address_selector, email_selector, url)

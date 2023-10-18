@@ -25,37 +25,25 @@ def create_table():
     conn.close()
 
 
-def store_listing(address=None, published_time=None, price=None, size=None, source_website_url=None):
-    
-    # Replace missing values with 'NaN' or any other placeholder value
-    address = address or "NaN"
-    published_time = published_time or "NaN"
-    price = price or "NaN"
-    size = size or "NaN"
-    source_website_url = source_website_url or "NaN"
-    
-    # Extract main part of domain from the URL
-    if source_website_url != "NaN":
-        parsed_url = urlparse(source_website_url)
-        domain = parsed_url.netloc.split(".")
-        if len(domain) > 2:
-            # For domains like 'www.example.com', extract 'example'
-            main_part = domain[-2]
-        else:
-            # For domains like 'example.com', extract 'example'
-            main_part = domain[0]
-    else:
-        main_part = "NaN"
-
+def store_listing(address, published_time=None, price=None, size=None, source_website_url=None):
     conn = sqlite3.connect(DATABASE_NAME)
     cursor = conn.cursor()
 
-    cursor.execute('''
-    INSERT INTO listings (address, published_time, price, size, source_website)
-    VALUES (?, ?, ?, ?, ?)
-    ''', (address, published_time, price, size, main_part))
+    # Extract until .com or .nl
+    main_part = source_website_url.split(".com")[0] + ".com" if ".com" in source_website_url else source_website_url.split(".nl")[0] + ".nl"
 
-    conn.commit()
+    # Listing with the same specific_url already exists or not
+    cursor.execute('SELECT * FROM listings WHERE specific_url = ?', (source_website_url,))
+    existing_listing = cursor.fetchone()
+
+    if not existing_listing:
+        cursor.execute('''
+        INSERT INTO listings (address, published_time, price, size, source_website, specific_url)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ''', (address, published_time or "NaN", price or "NaN", size or "NaN", main_part, source_website_url))
+
+        conn.commit()
+
     conn.close()
 
 
@@ -74,6 +62,13 @@ def get_all_listings():
 
 
 def clear_all_listings():
+    
+    confirmation = input("Are you sure you want to clear all listings? This action cannot be undone. (yes/no): ")
+    confirmation
+    if confirmation.lower() != 'yes':
+        print("Action cancelled.")
+        return
+
     conn = sqlite3.connect(DATABASE_NAME)
     cursor = conn.cursor()
 
@@ -83,6 +78,8 @@ def clear_all_listings():
 
     conn.commit()
     conn.close()
+    print("All listings cleared.")
+
 
 def alter_table():
     conn = sqlite3.connect(DATABASE_NAME)
