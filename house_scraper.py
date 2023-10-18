@@ -8,8 +8,11 @@ from twilio.rest import Client
 import logging
 import random
 import requests
+from dotenv import load_dotenv
 import os 
 
+from database import setup_db, store_listings, get_previous_listings
+#%%
 
 chrome_options = Options()
 chrome_options.add_argument("--headless")
@@ -35,6 +38,8 @@ WEBSITES = [
     }
 
 ]
+
+load_dotenv()
 
 EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
 OUTLOOK_EMAIL = os.environ.get('OUTLOOK_EMAIL')
@@ -122,13 +127,13 @@ def send_notification_to_owner(listing, address_selector, email_selector, url):
 
 # Twilio 
 def send_whatsapp_notification(message_body):
-    # Your Twilio account SID and Auth Token
+    # Twilio account SID and Auth Token
     ACCOUNT_SID = 'YOUR_TWILIO_ACCOUNT_SID'
     AUTH_TOKEN = 'YOUR_TWILIO_AUTH_TOKEN'
 
     client = Client(ACCOUNT_SID, AUTH_TOKEN)
 
-    # Your Twilio WhatsApp number (usually starts with "whatsapp:+1...")
+    # Twilio WhatsApp number (usually starts with "whatsapp:+1...")
     # and your personal WhatsApp number (make sure to include the country code, e.g., "+1234567890")
     from_whatsapp_number = 'whatsapp:YOUR_TWILIO_WHATSAPP_NUMBER'
     to_whatsapp_number = 'whatsapp:YOUR_PERSONAL_WHATSAPP_NUMBER'
@@ -152,7 +157,7 @@ def send_ifttt_notification(value1):
 
 #%%
 if __name__ == '__main__':
-
+    setup_db()
 
     previous_listings = {}
     MAX_PREVIOUS_LISTINGS = 100 
@@ -167,17 +172,20 @@ if __name__ == '__main__':
 
                 logging.info(f'Checking new listings for {url}')
                 
+                # Fetch the previous listings from the database
+                previous_listings_for_url = get_previous_listings(url)
+                
                 try:
                     current_listings = check_new_listings(url, listing_selector)
                 except Exception as e:
                     logging.error(f'Error checking listings for {url}: {e}')
                     continue  # Skip to the next website
                 
-                if url not in previous_listings:
-                    previous_listings[url] = []
-                
-                new_listings = [listing for listing in current_listings if listing not in previous_listings[url]]
-                
+                previous_listings_for_url = get_listings_from_db(url)
+
+                # Find new listings that aren't in the previous listings
+                new_listings = [listing for listing in current_listings if listing not in previous_listings_for_url]
+                                
                 for listing in new_listings:
                     try:
                         send_notification_to_owner(listing, address_selector, email_selector, url)
@@ -187,101 +195,12 @@ if __name__ == '__main__':
                     except Exception as e:
                         logging.error(f'Error sending notification for listing at {url}: {e}')
 
-                previous_listings[url] = current_listings[:MAX_PREVIOUS_LISTINGS]
-            
+                # Store the current listings in the database
+                store_listings(url, current_listings)
+
             sleep_duration = random.randint(40, 80)
             logging.info(f'Sleeping for {sleep_duration} seconds')
             time.sleep(sleep_duration)
 
     except Exception as e:
         logging.error(f'An unexpected error occurred: {e}')
-
-#%%
-
-def send_notification_to_owner(listing, address_selector, email_selector, url):
-    address = listing.select_one(address_selector).text
-    owner_email = listing.select_one(email_selector).text
-
-    google_maps_url = f"https://www.google.com/maps/search/?api=1&query={address.replace(' ', '+')}"
-
-    # Customized email
-    email_message_to_owner = f"""
-    I am very interested in viewing the available studio ({address}) and would like to arrange a visit as soon as possible. 
-
-    My gross monthly income is 4000 euros, I live alone, have no pets, and I am a non-smoker. I am currently employed as the Head of Product and Machine Learning Engineer at a health tech company based in Amsterdam.
-
-    Reach me at {PHONE_NUMBER} or respond directly to this email ({OUTLOOK_EMAIL}) to confirm the appointment or to discuss any other details.
-
-    Thank you for considering my application. I am looking forward to hearing back from you soon.
-
-    Kindly,
-    Simone Parvizi
-    """
-
-
-    # Send emails
-    with smtplib.SMTP('smtp-mail.outlook.com', 587) as server:
-        server.starttls()  # Upgrade the connection to secure encrypted SSL/TLS connection ????????
-        server.login(OUTLOOK_EMAIL, EMAIL_PASSWORD)
-
-
-        # Custom message
-        notification_email = f"You sent an email for the studio in {address} ({url}).\nHere's the location: {google_maps_url} "
-        
-
-
-        # For the owner email:
-        headers = [
-            "From: {}".format(OUTLOOK_EMAIL),
-            "Subject: Studio in {}".format(address),
-            "To: {}".format(owner_email),
-            "MIME-Version: 1.0",
-            "Content-Type: text/plain; charset=utf-8"
-        ]
-        full_email = "\r\n".join(headers) + "\r\n\r\n" + email_message_to_owner
-
-        # Send the email to the owner
-        server.sendmail(
-            OUTLOOK_EMAIL,
-            owner_email,
-            full_email.encode("utf-8")
-            )
-
-        # Email to yourself:
-        headers = [
-            "From: {}".format(OUTLOOK_EMAIL),
-            "Subject: FOUND A STUDIO at {}".format(address),
-            "To: {}".format(OUTLOOK_EMAIL),
-            "In-Reply-To: {}".format(owner_email),
-            "References: {}".format(owner_email),
-            "MIME-Version: 1.0",
-            "Content-Type: text/plain; charset=utf-8"
-            ]
-        
-        full_notification_email = "\r\n".join(headers) + "\r\n\r\n" + notification_email
-
-
-        # Send the notification email to yourself
-        server.sendmail(
-            OUTLOOK_EMAIL,
-            OUTLOOK_EMAIL,
-            full_notification_email.encode("utf-8")
-            )
-
-html = """
-<div class="listing">
-    <div class="address">123 Test Street</div>
-    <div class="email">parvizi.simone@gmail.com</div>
-</div>
-"""
-soup = BeautifulSoup(html, 'html.parser')
-listing = soup.select_one('.listing')
-
-# Dummy website
-url = "https://example.com/test-listing"
-address_selector = ".address"
-email_selector = ".email"
-
-send_notification_to_owner(listing, address_selector, email_selector, url)
-
-# %%
