@@ -11,13 +11,19 @@ import random
 import requests
 from dotenv import load_dotenv
 import os 
+from google.oauth2 import service_account
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.common.exceptions import StaleElementReferenceException
 
 from database import setup_db #, store_listings, get_previous_listings
-
+#%%
 
 chrome_options = Options()
 chrome_options.add_argument("--headless")
@@ -162,65 +168,190 @@ def send_ifttt_notification(value1):
     return response.status_code
 
 
-def login_to_huurstunt(email, password):
+# Huurstunt
+def login_to_huurstunt(driver, email, password):
     try:
         driver.get("https://www.huurstunt.nl/")
 
-        # Wait for the login button on the main page to appear and click it.
-        login_button = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, "//a[@href='/inloggen']"))
-        )
-        login_button.click()
+        # Handle the cookie consent bar
+        try:
+            cookie_allow_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "/html/body/div[2]/div/a[@aria-label='allow cookies']"))
+            )
+            cookie_allow_button.click()
+        except Exception as e:
+            logging.error(f"Error handling cookie consent: {e}")
 
-        # Wait for the login fields to appear.
+        # Click the "Account" button to open the login modal
+        account_button = driver.find_element(By.XPATH, "/html/body/nav/ul/li[2]/a")
+        driver.execute_script("arguments[0].scrollIntoView(true);", account_button)
+        account_button.click()
+
+        # Wait for and fill in the email and password fields in the login modal
         email_input = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "email"))
+            EC.element_to_be_clickable((By.ID, "login_form_userName"))
         )
-        password_input = driver.find_element(By.ID, "password")
-        submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
-
         email_input.send_keys(email)
+
+        
+        password_input = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, "//*[@id='login_form_userPass']"))
+        )
         password_input.send_keys(password)
+
+        # Wait for and click the 'Inloggen' button in the login modal
+        submit_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "/html/body/div[4]/div/div/div[1]/form/div[2]/div[1]/button"))
+        )
         submit_button.click()
 
-        # A basic check to verify successful login
-        WebDriverWait(driver, 10).until(EC.url_contains("dashboard"))
-        
-        logging.info("Successfully logged in to huurstunt.nl!")
+        time.sleep(10)
 
-    except NoSuchElementException as e:
-        logging.error(f"Element not found during login process: {e}")
     except Exception as e:
-        logging.error(f"An error occurred during the login process: {e}")
+        print(f"An error occurred during the login process: {e}")
 
 
-def login_to_pararius(email, password):
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Run Chrome in headless mode
-    driver = webdriver.Chrome(options=chrome_options)
+def set_max_price_huurstunt(driver, numerical_price):
 
-    driver.get("https://www.pararius.nl/inloggen")
+    price_mapping = {
+        0: '0',
+        100: '100',
+        200: '200',
+        300: '300',
+        400: '400',
+        500: '500',
+        600: '600',
+        700: '700',
+        800: '800',
+        900: '900',
+        1000: '1000',
+        1250: '1250',
+        1500: '1500',
+        1750: '1750',
+        2000: '2000',
+        2500: '2500',
+        3000: '3000',
+        3500: '3500',
+        4000: '4000',
+        5000: '5000',
+        6000: '6000',
+        10000: 'geen maximum'
+    }
 
-    # Click on 'Login with Google'
-    google_login_button = driver.find_element(By.XPATH, "//a[contains(text(), 'Ga verder met Google')]")
-    google_login_button.click()
+    # Find the closest price option
+    closest_price = min(price_mapping.keys(), key=lambda x: abs(x - numerical_price))
+    selected_option = price_mapping[closest_price]
 
-    # Wait for the Google login page to load (you might need to adjust the waiting time)
-    time.sleep(3)
+    # Locate the price dropdown element and select the option
+    price_dropdown = driver.find_element(By.XPATH, '//*[@id="price_till"]')
+    price_dropdown.click()
+    print(f"Selected option max_price: {selected_option}")
+    option_xpath = f'//option[text()="{selected_option}"]'
+    option = driver.find_element(By.XPATH, option_xpath)
+    option.click()
+    print("Clicked option for max_price"	)
 
-    # Fill in the email and password
-    email_input = driver.find_element(By.XPATH, "//input[@type='email']")
-    email_input.send_keys(email)
-    email_input.send_keys(Keys.RETURN)
+def set_min_price_huurstunt(driver, numerical_price):
+    
+    price_mapping = {
+        0: '0',
+        100: '100',
+        200: '200',
+        300: '300',
+        400: '400',
+        500: '500',
+        600: '600',
+        700: '700',
+        800: '800',
+        900: '900',
+        1000: '1000',
+        1250: '1250',
+        1500: '1500',
+        1750: '1750',
+        2000: '2000',
+        2500: '2500',
+        3000: '3000',
+        3500: '3500',
+        4000: '4000',
+        5000: '5000',
+        6000: '6000',
+        10000: 'geen minimum'
+    }
 
-    time.sleep(3)  # Wait for the password field to appear
+    # Closest price option
+    closest_price = min(price_mapping.keys(), key=lambda x: abs(x - numerical_price))
+    selected_option = price_mapping[closest_price]
 
-    password_input = driver.find_element(By.XPATH, "//input[@type='password']")
-    password_input.send_keys(password)
-    password_input.send_keys(Keys.RETURN)
+    # Locate the price dropdown element and select the option
+    #price_dropdown = driver.find_element(By.XPATH, '//*[@id="price_from"]')
+    try:
+        # Find and click the min price dropdown
+        price_dropdown = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, '//*[@id="price_from"]'))
+        )
+        price_dropdown.click()
+        print('Clicked price dropdown')
+    except StaleElementReferenceException:
+        # If a StaleElementReferenceException occurs, re-locate the element
+        price_dropdown = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, '//*[@id="price_from"]'))
+        )
+        price_dropdown.click()
+        print('Clicked price dropdown')
+        
+    selected_option = str(numerical_price)
+    option_xpath = f'//option[text()="{selected_option}"]'
+    #option = driver.find_element(By.XPATH, option_xpath)
+    option = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, option_xpath))
+    )
+    option.click()
+    print("Clicked option for min_price")
 
-    # Optionally, you can return the driver to use it for further interactions
-    return driver
+
+def set_filters_huurstunt(driver, min_price, max_price, location):
+
+    set_min_price_huurstunt(driver, min_price)
+    set_max_price_huurstunt(driver, max_price)
+
+    # Location
+    location_dropdown = driver.find_element(By.XPATH, '//*[@id="location"]')
+    location_dropdown.click()
+    print('Clicked location dropdown')
+    location_option = driver.find_element(By.XPATH, f'//option[text()="{location}"]')
+    location_option.click()
+    print("Clicked option for location")
+
+    # Click the 'search' button to perform the search
+    search_button = driver.find_element(By.XPATH, '/html/body/div[3]/div[1]/div/div/div/div/form/div[2]/button')
+    search_button.click()
+    print("Clicked search button")
+
+    # Wait for search results to load (you can adjust the timeout as needed)
+    wait = WebDriverWait(driver, 20)
+    #wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'your-search-results-class')))
+
+
+
+
+def authenticate_google_account():
+    # Check if the user has already authenticated and stored their credentials
+    creds = None
+    if os.path.exists('token.json'):
+        creds = service_account.Credentials.from_authorized_user_file('token.json', SCOPES)
+
+    # If not, initiate the OAuth flow to obtain credentials
+    if not creds or not creds.valid:
+        flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+        creds = flow.run_local_server(port=0)
+        # Save the credentials for future use
+        with open('token.json', 'w') as token_file:
+            token_file.write(creds.to_json())
+
+    # Build a service object using the obtained credentials
+    service = build('drive', 'v3', credentials=creds)
+
+    return service
 
 
 if __name__ == '__main__':
