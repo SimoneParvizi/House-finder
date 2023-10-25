@@ -204,11 +204,49 @@ def login_to_huurstunt(driver, email, password):
             EC.element_to_be_clickable((By.XPATH, "/html/body/div[4]/div/div/div[1]/form/div[2]/div[1]/button"))
         )
         submit_button.click()
+        print('correclty logged in')
 
-        time.sleep(10)
+        numerical_price = 1500
+        price_mapping = {
+            0: '0',
+            100: '100',
+            200: '200',
+            300: '300',
+            400: '400',
+            500: '500',
+            600: '600',
+            700: '700',
+            800: '800',
+            900: '900',
+            1000: '1000',
+            1250: '1250',
+            1500: '1500',
+            1750: '1750',
+            2000: '2000',
+            2500: '2500',
+            3000: '3000',
+            3500: '3500',
+            4000: '4000',
+            5000: '5000',
+            6000: '6000',
+            10000: 'geen maximum'
+        }
+
+        # Find the closest price option
+        closest_price = min(price_mapping.keys(), key=lambda x: abs(x - numerical_price))
+        selected_option = price_mapping[closest_price]
+
+        # Locate the price dropdown element and select the option
+        price_dropdown = driver.find_element(By.XPATH, '//*[@id="price_till"]')
+        price_dropdown.click()
+        print(f"Selected option max_price: {selected_option}")
+        option_xpath = f'//option[text()="{selected_option}"]'
+        option = driver.find_element(By.XPATH, option_xpath)
+        option.click()
+        print("Clicked option for max_price"	)
 
     except Exception as e:
-        print(f"An error occurred during the login process: {e}")
+            print(f"An error occurred during the login process: {e}")
 
 
 def set_max_price_huurstunt(driver, numerical_price):
