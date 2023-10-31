@@ -97,3 +97,4 @@ def alter_table():
     conn.commit()
     conn.close()
 
+

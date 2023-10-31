@@ -368,15 +368,35 @@ def set_filters_huurstunt(driver, min_price, max_price, location):
     location_field = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.ID, 'location'))
     )
-    location_field.click()
-    location_field.clear()
     location_field.send_keys(location)
+
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, ".suggestion.tt-suggestion"))
+    )
+
+    location_field.send_keys(Keys.ARROW_DOWN)
     location_field.send_keys(Keys.RETURN)
 
     # Search
-    time.sleep(2) 
+    time.sleep(2)
     search_button = driver.find_element(By.XPATH, '/html/body/div[3]/div[1]/div/div/div/div/form/div[2]/button')
     search_button.click()
+
+    # Studio option
+    time.sleep(2)
+    studio_button = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, "//label[@class='form-check-label' and contains(text(), 'Studio')]"))
+    )
+    
+    driver.execute_script("arguments[0].scrollIntoView(true);", studio_button)
+    time.sleep(2)
+    driver.execute_script("arguments[0].click();", studio_button)
+
+
+
+
+
+
 
 
 # To finish
