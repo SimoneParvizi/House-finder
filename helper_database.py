@@ -6,6 +6,7 @@ DATABASE_NAME = "listings.db"
 def setup_db():
     create_table()
 
+
 def create_table():
     conn = sqlite3.connect(DATABASE_NAME)
     cursor = conn.cursor()
@@ -38,7 +39,7 @@ def store_listing(address, price=None, size=None, source_website_url=None):
 
     if not existing_listing:
         cursor.execute('''
-        INSERT INTO listings (address, price,, source_website, specific_url)
+        INSERT INTO listings (address, price, source_website, specific_url)
         VALUES (?, ?, ?, ?, ?, ?)
         ''', (address, price or "NaN", size or "NaN", main_part, source_website_url))
 
@@ -52,13 +53,35 @@ def get_all_listings():
     cursor = conn.cursor()
 
     cursor.execute('''
-    SELECT address, published_time, price, size, source_website FROM listings
+    SELECT address, price, size, source_website, specific_url FROM listings
     ''')
 
     listings = cursor.fetchall()
     conn.close()
 
     return listings
+
+
+def get_columns_of_table(table_name):
+    conn = sqlite3.connect(DATABASE_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute(f"PRAGMA table_info({table_name});")
+    columns = cursor.fetchall()
+
+    conn.close()
+    return [column[1] for column in columns]  # column[1] is the column name in the result
+
+
+def get_all_tables():
+    conn = sqlite3.connect(DATABASE_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = cursor.fetchall()
+
+    conn.close()
+    return [table[0] for table in tables]
 
 
 def clear_all_listings():
