@@ -25,7 +25,7 @@ def create_table():
     conn.close()
 
 
-def store_listing(address, published_time=None, price=None, size=None, source_website_url=None):
+def store_listing(address, price=None, size=None, source_website_url=None):
     conn = sqlite3.connect(DATABASE_NAME)
     cursor = conn.cursor()
 
@@ -38,9 +38,9 @@ def store_listing(address, published_time=None, price=None, size=None, source_we
 
     if not existing_listing:
         cursor.execute('''
-        INSERT INTO listings (address, published_time, price, size, source_website, specific_url)
+        INSERT INTO listings (address, price,, source_website, specific_url)
         VALUES (?, ?, ?, ?, ?, ?)
-        ''', (address, published_time or "NaN", price or "NaN", size or "NaN", main_part, source_website_url))
+        ''', (address, price or "NaN", size or "NaN", main_part, source_website_url))
 
         conn.commit()
 
