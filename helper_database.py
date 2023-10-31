@@ -1,5 +1,6 @@
 import sqlite3
 from urllib.parse import urlparse
+from selenium.webdriver.common.by import By
 
 DATABASE_NAME = "listings.db"
 
@@ -39,8 +40,8 @@ def store_listing(address, price=None, size=None, source_website_url=None):
 
     if not existing_listing:
         cursor.execute('''
-        INSERT INTO listings (address, price, source_website, specific_url)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO listings (address, price, size, source_website, specific_url)
+        VALUES (?, ?, ?, ?, ?)
         ''', (address, price or "NaN", size or "NaN", main_part, source_website_url))
 
         conn.commit()
@@ -121,3 +122,27 @@ def alter_table():
     conn.close()
 
 
+def extract_store_listings_huurstunt(driver):
+    
+    # For specific URL
+    base_xpath = "/html/body/div[3]/div[2]/section[1]/div/div[2]/div[2]/div[2]/div/div[{}]/div/div/div/div/a"
+
+    # Fetch all listings from the webpage
+    listings = driver.find_elements(By.XPATH, '//div[contains(@class, "rental-card-wide") and contains(@class, "col-lg-12") and contains(@class, "col-md-12")]')
+
+    for idx, listing in enumerate(listings, start=1):
+        
+        # Specific URL for each listing 
+        xpath = base_xpath.format(idx)
+        try:
+            element = driver.find_element(By.XPATH, xpath)
+            specific_url = element.get_attribute('href')
+        except:
+            continue  # No URL means the listing is not available anymore, so skip it
+        
+        parts = listing.text.split('\n')
+        address = parts[1]
+        price = parts[2]
+        size = parts[4]
+
+        store_listing(address, price, size, specific_url)
