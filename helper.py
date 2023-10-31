@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 import smtplib
 from twilio.rest import Client
 import requests
+import time
 from google.oauth2 import service_account
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
@@ -362,22 +363,20 @@ def set_filters_huurstunt(driver, min_price, max_price, location):
     set_min_price_huurstunt(driver, min_price)
     set_max_price_huurstunt(driver, max_price)
 
+    time.sleep(2)
     # Location
-    location_dropdown = driver.find_element(By.XPATH, '//*[@id="location"]')
-    location_dropdown.click()
-    print('Clicked location dropdown')
-    location_option = driver.find_element(By.XPATH, f'//option[text()="{location}"]')
-    location_option.click()
-    print("Clicked option for location")
+    location_field = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.ID, 'location'))
+    )
+    location_field.click()
+    location_field.clear()
+    location_field.send_keys(location)
+    location_field.send_keys(Keys.RETURN)
 
-    # Click the 'search' button to perform the search
+    # Search
+    time.sleep(2) 
     search_button = driver.find_element(By.XPATH, '/html/body/div[3]/div[1]/div/div/div/div/form/div[2]/button')
     search_button.click()
-    print("Clicked search button")
-
-    # Wait for search results to load (you can adjust the timeout as needed)
-    wait = WebDriverWait(driver, 20)
-    #wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'your-search-results-class')))
 
 
 # To finish
