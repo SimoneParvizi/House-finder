@@ -271,7 +271,6 @@ def login_to_huurstunt_2(driver, email, password, max_attempts=3):
     return False
 
 
-
 def set_max_price_huurstunt(driver, numerical_price):
     price_mapping = {
         0: '0',

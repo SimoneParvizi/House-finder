@@ -122,6 +122,32 @@ def alter_table():
     conn.close()
 
 
+# def extract_store_listings_huurstunt(driver):
+    
+#     # For specific URL
+#     base_xpath = "/html/body/div[3]/div[2]/section[1]/div/div[2]/div[2]/div[2]/div/div[{}]/div/div/div/div/a"
+
+#     # Fetch all listings from the webpage
+#     listings = driver.find_elements(By.XPATH, '//div[contains(@class, "rental-card-wide") and contains(@class, "col-lg-12") and contains(@class, "col-md-12")]')
+
+#     for idx, listing in enumerate(listings, start=1):
+        
+#         # Specific URL for each listing 
+#         xpath = base_xpath.format(idx)
+#         try:
+#             element = driver.find_element(By.XPATH, xpath)
+#             specific_url = element.get_attribute('href')
+#         except:
+#             continue  # No URL means the listing is not available anymore, so skip it
+        
+#         parts = listing.text.split('\n')
+#         address = parts[1]
+#         price = parts[2]
+#         size = parts[4]
+
+#         store_listing(address, price, size, specific_url)
+
+
 def extract_store_listings_huurstunt(driver):
     
     # For specific URL
@@ -129,20 +155,64 @@ def extract_store_listings_huurstunt(driver):
 
     # Fetch all listings from the webpage
     listings = driver.find_elements(By.XPATH, '//div[contains(@class, "rental-card-wide") and contains(@class, "col-lg-12") and contains(@class, "col-md-12")]')
+    
+    extracted_listings = []
 
-    for idx, listing in enumerate(listings, start=1):
+    for idx, element in enumerate(listings, start=1):
         
         # Specific URL for each listing 
         xpath = base_xpath.format(idx)
         try:
-            element = driver.find_element(By.XPATH, xpath)
-            specific_url = element.get_attribute('href')
+            listing_element = driver.find_element(By.XPATH, xpath)
+            specific_url = listing_element.get_attribute('href')
         except:
             continue  # No URL means the listing is not available anymore, so skip it
         
-        parts = listing.text.split('\n')
+        parts = element.text.split('\n')
         address = parts[1]
         price = parts[2]
         size = parts[4]
 
+        listing_data = {
+            "id": idx,  
+            "address": address,
+            "price": price,
+            "size": size,
+            "specific_url": specific_url
+        }
+
+        extracted_listings.append(listing_data)
+        
         store_listing(address, price, size, specific_url)
+
+    return extracted_listings
+
+
+def should_send_email(listing_id):
+    conn = sqlite3.connect(DATABASE_NAME)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+    SELECT email_sent FROM listings WHERE id = ?
+    ''', (listing_id,))
+    
+    result = cursor.fetchone()
+    conn.close()
+
+    # If listing is not in the database or email hasn't been sent, return True
+    if not result or not result[0]:
+        return True
+    return False
+
+
+
+def mark_email_as_sent(listing_id):
+    conn = sqlite3.connect(DATABASE_NAME)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+    UPDATE listings SET email_sent = ? WHERE id = ?
+    ''', (True, listing_id,))
+    
+    conn.commit()
+    conn.close()
